@@ -1,0 +1,28 @@
+{
+  "token": "BOT_TOKEN",
+  "activityTimeout": 3,
+  "ticketTranscriptChannelId": "000000000000000",
+  "pathToTranscriptsDirectory": "path/to/transcripts/directory",
+
+  "database": {
+    "ip": "127.0. 0.1",
+    "user": "user",
+    "password": "password",
+    "database": "database"
+  },
+
+  "support": {
+    "roleId": "000000000000000",
+    "category": "000000000000000"
+  },
+
+  "appeal": {
+    "roleId": "000000000000000",
+    "category": "000000000000000"
+  },
+
+  "buy": {
+    "roleId": "000000000000000",
+    "category": "000000000000000"
+  }
+}
