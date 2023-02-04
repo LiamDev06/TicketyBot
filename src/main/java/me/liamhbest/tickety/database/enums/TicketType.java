@@ -1,15 +1,13 @@
 package me.liamhbest.tickety.database.enums;
 
 import me.liamhbest.tickety.TicketyBot;
-import me.liamhbest.tickety.utility.BotConfig;
 
 public enum TicketType {
 
-    SUPPORT("Support", Long.parseLong(TicketyBot.getInstance().getConfig().getSupportTicket().getRoleId())),
-    APPEAL("Appeal", Long.parseLong(TicketyBot.getInstance().getConfig().getAppealTicket().getRoleId())),
-    BUY("Buy", Long.parseLong(TicketyBot.getInstance().getConfig().getBuyTicket().getRoleId()));
+    SUPPORT("Support", TicketyBot.get().getConfig().getSupportTicket().getRoleId()),
+    APPEAL("Appeal", TicketyBot.get().getConfig().getAppealTicket().getRoleId()),
+    BUY("Buy", TicketyBot.get().getConfig().getBuyTicket().getRoleId());
 
-    private final BotConfig config = TicketyBot.getInstance().getConfig();
     private final String displayName;
     private final long roleId;
 

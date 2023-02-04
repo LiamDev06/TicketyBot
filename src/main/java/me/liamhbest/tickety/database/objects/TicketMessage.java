@@ -1,23 +1,16 @@
 package me.liamhbest.tickety.database.objects;
 
 import dev.morphia.annotations.Embedded;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 @Embedded
 public class TicketMessage {
 
-    // Id of the message
-    private final String messageId;
-
-    // Content of the message
+    private final @NonNull String messageId;
     private final String content;
+    private final long userId, sentTimestamp;
 
-    // Id of the sender of the ticket
-    private final long userId;
-
-    // The timestamp of when the message was sent
-    private final long sentTimestamp;
-
-    public TicketMessage(String messageId, String content, long userId) {
+    public TicketMessage(@NonNull String messageId, String content, long userId) {
         this.messageId = messageId;
         this.content = content;
         this.userId = userId;
@@ -25,18 +18,18 @@ public class TicketMessage {
     }
 
     public String getContent() {
-        return content;
+        return this.content;
     }
 
     public long getUserId() {
-        return userId;
+        return this.userId;
     }
 
-    public String getMessageId() {
-        return messageId;
+    public @NonNull String getMessageId() {
+        return this.messageId;
     }
 
     public long getSentTimestamp() {
-        return sentTimestamp;
+        return this.sentTimestamp;
     }
 }

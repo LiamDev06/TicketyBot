@@ -7,11 +7,11 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import dev.morphia.Datastore;
 import dev.morphia.Morphia;
-import dev.morphia.mapping.Mapper;
 import dev.morphia.query.Query;
 import dev.morphia.query.experimental.filters.Filters;
 import me.liamhbest.tickety.utility.BotConfig;
 import me.liamhbest.tickety.utility.exceptions.DatabaseLoadException;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,41 +21,42 @@ import java.util.logging.Logger;
 
 public class Database {
 
-    private final Datastore datastore;
-    private final Logger log = Logger.getLogger("Database");
-    private Map<String, Ticket> ticketsCache;
-    private final MongoClient mongoClient;
+    private final @NonNull Datastore datastore;
+    private final @NonNull Map<String, Ticket> ticketsCache;
+    private final @NonNull MongoClient mongoClient;
 
     public Database(BotConfig config) throws DatabaseLoadException {
-        log.info("Starting database module...");
+        final Logger log = Logger.getLogger("Database");
+        log.info("Connecting to the database...");
 
         // Creating caches
         this.ticketsCache = new HashMap<>();
 
         // Setup connection string
-        String connectionUri = "mongodb+srv://" +
-                config.getDatabase().getUser() + ":" + config.getDatabase().getPassword() + "@"
-                + config.getDatabase().getIp() + "/?retryWrites=true&w=majority";
+        BotConfig.Database dbConfig = config.getDatabase();
+        String connectionUri = String.format(
+                "mongodb+srv://%s:%s@%s/?retryWrites=true&w=majority",
+                dbConfig.getUser(),
+                dbConfig.getPassword(),
+                dbConfig.getIp());
         ConnectionString connectionString = new ConnectionString(connectionUri);
 
         try {
             // Connect to database
-            MongoClientSettings clientSettings = MongoClientSettings.builder()
-                    .applyConnectionString(connectionString).build();
+            MongoClientSettings clientSettings = MongoClientSettings.builder().applyConnectionString(connectionString).build();
             this.mongoClient = MongoClients.create(clientSettings);
 
             // Setting up datastore with Morphia
-            this.datastore = Morphia.createDatastore(mongoClient, config.getDatabase().getDatabase());
+            this.datastore = Morphia.createDatastore(this.mongoClient, config.getDatabase().getDatabase());
 
             // Map models to collections
-            Mapper mapper = datastore.getMapper();
-            mapper.map(Ticket.class);
-            datastore.ensureIndexes();
+            this.datastore.getMapper().map(Ticket.class);
+            this.datastore.ensureIndexes();
         } catch (Exception exception) {
-            throw new DatabaseLoadException("Error while handling to MongoDB. Could not connect!");
+            throw new DatabaseLoadException("Error while connecting to the Mongo database!");
+        } finally {
+            log.info("Successfully connected to the database!");
         }
-
-        log.info("Successfully connected to MongoDB!");
     }
 
     /**
@@ -67,22 +68,21 @@ public class Database {
      */
     public Ticket getTicket(String id) {
         // Check if the ticket exists in the cache
-        if (ticketsCache.containsKey(id)) return ticketsCache.get(id);
+        if (this.ticketsCache.containsKey(id)) {
+            this.ticketsCache.get(id);
+        }
 
         // Find the ticket in the database
-        Query<Ticket> query = datastore.find(Ticket.class);
+        Query<Ticket> query = this.datastore.find(Ticket.class);
         Ticket ticket = query.filter(Filters.eq("id", id)).first();
 
         // Return the ticket if it exists
         if (ticket != null) {
-            ticket.setDatabaseInstance(this);
-
-            // Cache the ticket
-            ticketsCache.put(id, ticket);
+            ticket.setDatabase(this);
+            this.ticketsCache.put(id, ticket);
             return ticket;
         }
 
-        // Return null, the ticket does not exist at all
         return null;
     }
 
@@ -95,24 +95,23 @@ public class Database {
      */
     public Ticket getTicketFromChannelId(long channelId) {
         // Check if the ticket exists in the cache
-        for (Ticket ticket : ticketsCache.values()) {
-            if (ticket.getTicketChannelId() == channelId) return ticket;
+        for (Ticket ticket : this.ticketsCache.values()) {
+            if (ticket.getTicketChannelId() == channelId) {
+                return ticket;
+            }
         }
 
         // Find the ticket in the database
-        Query<Ticket> query = datastore.find(Ticket.class);
+        Query<Ticket> query = this.datastore.find(Ticket.class);
         Ticket ticket = query.filter(Filters.eq("ticketChannelId", channelId)).first();
 
         // Return the ticket if it exists
         if (ticket != null) {
-            ticket.setDatabaseInstance(this);
-
-            // Cache the ticket
+            ticket.setDatabase(this);
             ticketsCache.put(ticket.getId(), ticket);
             return ticket;
         }
 
-        // Return null, the ticket does not exist at all
         return null;
     }
 
@@ -121,7 +120,7 @@ public class Database {
      * @param ticket the ticket to save
      */
     public void saveTicket(Ticket ticket) {
-        datastore.save(ticket);
+        this.datastore.save(ticket);
     }
 
     /**
@@ -129,7 +128,7 @@ public class Database {
      */
     public void saveAllTickets() {
         for (Ticket ticket : this.ticketsCache.values()) {
-            saveTicket(ticket);
+            this.saveTicket(ticket);
         }
     }
 
@@ -141,15 +140,14 @@ public class Database {
      */
     public List<Ticket> getTickets() {
         // Load the collection from the database
-        MongoCollection<Ticket> collection = datastore.getMapper().getCollection(Ticket.class);
+        MongoCollection<Ticket> collection = this.datastore.getMapper().getCollection(Ticket.class);
         List<Ticket> list = collection.find().into(new ArrayList<>());
 
         // Cache the result
         for (Ticket target : list) {
-            ticketsCache.put(target.getId(), target);
+            this.ticketsCache.put(target.getId(), target);
         }
 
-        // Return the list
         return list;
     }
 
@@ -159,27 +157,13 @@ public class Database {
      * @param ticket the ticket object to delete
      */
     public void deleteTicket(Ticket ticket) {
-        ticketsCache.remove(ticket.getId());
-        datastore.delete(ticket);
-    }
-
-    public Datastore getDatastore() {
-        return datastore;
-    }
-
-    public Map<String, Ticket> getTicketsCache() {
-        return ticketsCache;
+        this.ticketsCache.remove(ticket.getId());
+        this.datastore.delete(ticket);
     }
 
     public void shutdown() {
-        // Save everything
-        saveAllTickets();
-
-        // Cache set to null
-        this.ticketsCache = null;
-
-        // Close
-        mongoClient.close();
+        this.saveAllTickets();
+        this.mongoClient.close();
     }
 }
 

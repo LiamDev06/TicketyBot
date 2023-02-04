@@ -5,7 +5,7 @@
   "pathToTranscriptsDirectory": "path/to/transcripts/directory",
 
   "database": {
-    "ip": "127.0. 0.1",
+    "ip": "localhost",
     "user": "user",
     "password": "password",
     "database": "database"

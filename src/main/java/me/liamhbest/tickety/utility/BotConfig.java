@@ -3,8 +3,8 @@ package me.liamhbest.tickety.utility;
 public class BotConfig {
 
     private String token;
-    private int activityTimeout; // in seconds, the time to check for no activity and then delete ticket
     private String ticketTranscriptChannelId;
+    private int activityTimeout; // in seconds, the time to check for no activity and then delete ticket
     private String pathToTranscriptsDirectory;
     private Database database;
     private Support support;
@@ -16,19 +16,19 @@ public class BotConfig {
         private String ip, user, password, database;
 
         public String getIp() {
-            return ip;
+            return this.ip;
         }
 
         public String getUser() {
-            return user;
+            return this.user;
         }
 
         public String getPassword() {
-            return password;
+            return this.password;
         }
 
         public String getDatabase() {
-            return database;
+            return this.database;
         }
     }
 
@@ -36,12 +36,12 @@ public class BotConfig {
     public static class Support {
         private String roleId, category;
 
-        public String getRoleId() {
-            return roleId;
+        public long getRoleId() {
+            return Long.parseLong(this.roleId);
         }
 
         public String getCategory() {
-            return category;
+            return this.category;
         }
     }
 
@@ -49,12 +49,12 @@ public class BotConfig {
     public static class Appeal {
         private String roleId, category;
 
-        public String getRoleId() {
-            return roleId;
+        public long getRoleId() {
+            return Long.parseLong(this.roleId);
         }
 
         public String getCategory() {
-            return category;
+            return this.category;
         }
     }
 
@@ -62,44 +62,44 @@ public class BotConfig {
     public static class Buy {
         private String roleId, category;
 
-        public String getRoleId() {
-            return roleId;
+        public long getRoleId() {
+            return Long.parseLong(this.roleId);
         }
 
         public String getCategory() {
-            return category;
+            return this.category;
         }
     }
 
     public String getToken() {
-        return token;
+        return this.token;
     }
 
     public Appeal getAppealTicket() {
-        return appeal;
+        return this.appeal;
     }
 
     public Support getSupportTicket() {
-        return support;
+        return this.support;
     }
 
     public Buy getBuyTicket() {
-        return buy;
+        return this.buy;
     }
 
     public int getActivityTimeout() {
-        return activityTimeout;
+        return this.activityTimeout;
     }
 
     public String getTicketTranscriptChannelId() {
-        return ticketTranscriptChannelId;
+        return this.ticketTranscriptChannelId;
     }
 
     public String getPathToTranscriptsDirectory() {
-        return pathToTranscriptsDirectory;
+        return this.pathToTranscriptsDirectory;
     }
 
     public Database getDatabase() {
-        return database;
+        return this.database;
     }
 }

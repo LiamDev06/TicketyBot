@@ -5,6 +5,7 @@ import dev.morphia.annotations.Id;
 import dev.morphia.annotations.Transient;
 import me.liamhbest.tickety.database.enums.TicketType;
 import me.liamhbest.tickety.database.objects.TicketMessage;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,79 +14,54 @@ import java.util.List;
 public class Ticket {
 
     @Id
-    private final String id;
+    private final @NonNull String id;
 
     @Transient
-    private Database database;
+    private @NonNull Database database;
 
     // Values
-    private long userCreatorId;
+    private final long userCreatorId;
     private long ticketChannelId;
-    private String ticketType;
-    private List<TicketMessage> messageHistory = new ArrayList<>();
+    private final @NonNull String ticketType;
+    private final @NonNull List<TicketMessage> messageHistory = new ArrayList<>();
 
-    // Setup new ticket
-    public Ticket(String id, long userCreatorId,TicketType ticketType) {
+    public Ticket(@NonNull Database database, @NonNull String id, long userCreatorId, TicketType ticketType) {
+        this.database = database;
         this.id = id;
         this.userCreatorId = userCreatorId;
         this.ticketType = ticketType.name();
     }
 
-    // Database Instance
-    public Ticket setDatabaseInstance(Database database) {
+    public void setDatabase(@NonNull Database database) {
         this.database = database;
-        return this;
     }
 
-    public Database getDatabase() {
-        return database;
+    public void save() {
+        this.database.saveTicket(this);
     }
 
-    // Saving user to database
-    public Ticket save() {
-        database.saveTicket(this);
-        return this;
-    }
-
-    public Ticket setupLists() {
-        if (messageHistory == null) messageHistory = new ArrayList<>();
-        return this;
-    }
-
-    public String getId() {
-        return id;
+    public @NonNull String getId() {
+        return this.id;
     }
 
     public long getUserCreatorId() {
-        return userCreatorId;
-    }
-
-    public Ticket setUserCreatorId(long userCreatorId) {
-        this.userCreatorId = userCreatorId;
-        return this;
+        return this.userCreatorId;
     }
 
     public TicketType getTicketType() {
-        return TicketType.valueOf(ticketType);
+        return TicketType.valueOf(this.ticketType);
     }
 
-    public Ticket setTicketType(TicketType type) {
-        this.ticketType = type.name();
-        return this;
+    public @NonNull List<TicketMessage> getMessageHistory() {
+        return this.messageHistory;
     }
 
-    public List<TicketMessage> getMessageHistory() {
-        return messageHistory;
-    }
-
-    public Ticket addTicketMessage(TicketMessage ticketMessage) {
-        if (this.messageHistory == null) this.messageHistory = new ArrayList<>();
+    public void addTicketMessage(TicketMessage ticketMessage) {
         this.messageHistory.add(ticketMessage);
-        return this;
     }
 
     public long getTicketChannelId() {
-        return ticketChannelId;
+        return this.ticketChannelId;
     }
 
     public Ticket setTicketChannelId(long ticketChannelId) {

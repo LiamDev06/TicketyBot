@@ -1,6 +1,7 @@
 package me.liamhbest.tickety;
 
 import com.google.gson.Gson;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.liamhbest.tickety.database.Database;
 import me.liamhbest.tickety.database.Ticket;
 import me.liamhbest.tickety.listeners.ButtonListener;
@@ -9,6 +10,7 @@ import me.liamhbest.tickety.listeners.GeneralListener;
 import me.liamhbest.tickety.managers.ActivityManager;
 import me.liamhbest.tickety.utility.BotConfig;
 import me.liamhbest.tickety.utility.Common;
+import me.liamhbest.tickety.utility.exceptions.DatabaseLoadException;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -21,14 +23,11 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.FileUpload;
 import org.jetbrains.annotations.NotNull;
 
+import javax.security.auth.login.LoginException;
 import java.awt.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.InputStream;
+import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -36,66 +35,74 @@ import java.util.logging.Logger;
 
 public class TicketyBot extends ListenerAdapter {
 
-    private static TicketyBot instance;
-    private final JDA jda;
-    private final Logger log = Logger.getLogger("Tickety");
-    private final BotConfig config;
-    private final ActivityManager activityManager;
-    private final Database database;
+    private static TicketyBot INSTANCE;
 
-    public TicketyBot() throws Exception {
+    private final @NotNull JDA jda;
+    private final @NotNull Logger log = Logger.getLogger("Tickety");
+    private final @NotNull BotConfig config;
+    private final @NotNull ActivityManager activityManager;
+    private final @NotNull Database database;
+
+    public TicketyBot() throws LoginException, IOException, InterruptedException, DatabaseLoadException, URISyntaxException {
         long time = System.currentTimeMillis();
         log.info("Starting Tickety bot...");
 
         // Loading configuration
         URL url = ClassLoader.getSystemResource("config.json");
         File file = new File(url.toURI());
-        Gson gson = new Gson();
-        this.config = gson.fromJson(new FileReader(file), BotConfig.class);
+        this.config = new Gson().fromJson(new FileReader(file), BotConfig.class);
 
-        // Init
+        // Initialization
         this.activityManager = new ActivityManager();
-        this.database = new Database(config);
+        this.database = new Database(this.config);
 
         // Create bot
-        this.jda = JDABuilder.createDefault(config.getToken())
+        this.jda = JDABuilder.createDefault(this.config.getToken())
                 .setActivity(Activity.watching("over tickets"))
                 .enableIntents(GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
-                .build().awaitReady();
+                .build()
+                .awaitReady();
 
         // Register commands and listeners
-        registerCommands();
-        registerListeners();
+        this.registerCommands();
+        this.registerListeners();
 
-        // Register all existing channels in the database to the activity manager
-        // As bot was shutdown, the timer restarts
-        for (Ticket ticket : database.getTickets()) {
-            TextChannel channel = jda.getTextChannelById(ticket.getTicketChannelId());
-            if (channel == null) continue;
+        // Register all existing channels in the database to the activity manager (as the bot was shutdown, timer restarts)
+        for (Ticket ticket : this.database.getTickets()) {
+            TextChannel channel = this.jda.getTextChannelById(ticket.getTicketChannelId());
 
-            activityManager.updateActivity(channel);
+            // Update the last activity in the channel
+            if (channel != null) {
+                this.activityManager.updateActivity(channel);
+            }
         }
 
         // Create executor service to check for ticket activity
-        int activityTimeout = config.getActivityTimeout();
+        int activityTimeout = this.config.getActivityTimeout();
         long activityTimeoutMillis = 60_000L * activityTimeout;
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+
         Runnable task = new Runnable() {
             public void run() {
-                // To get around the ConcurrentModificationException
-                List<Long> list = new ArrayList<>(activityManager.getLastActivity().keySet());
-
-                for (long channelId : list) {
-                    long time = activityManager.getLastActivity().get(channelId);
+                for (long channelId : new LongArrayList(activityManager.getLastActivity().keySet())) {
+                    long time = activityManager.getLastActivity(channelId);
 
                     if (System.currentTimeMillis() > (time + activityTimeoutMillis)) {
                         TextChannel channel = jda.getTextChannelById(channelId);
-                        String ticketId = channel.getName().replace("support-", "").replace("appeal-", "").replace("buy-", "");
+                        if (channel == null) {
+                            continue;
+                        }
+
+                        String ticketId = channel.getName()
+                                .replace("support-", "")
+                                .replace("appeal-", "")
+                                .replace("buy-", "");
                         activityManager.removeChannel(channel);
 
                         // Warn
-                        channel.sendMessageEmbeds(
-                                        Common.embed("**NO ACTIVITY!** This channel has reached the threshold for no activity, it will now be deleted.", Color.RED))
+                        channel.sendMessageEmbeds(Common.embed(
+                                "**NO ACTIVITY!** This channel has reached the threshold for no activity, it will now be deleted.",
+                                        Color.RED))
                                 .queue();
 
                         // Find the ticket
@@ -105,25 +112,10 @@ public class TicketyBot extends ListenerAdapter {
                             return;
                         }
 
-                        // Get the transcript channel
+                        // Get the transcript channel and create the transcript
                         TextChannel transcriptChannel = jda.getTextChannelById(config.getTicketTranscriptChannelId());
-
                         if (transcriptChannel != null) {
-                            try {
-                                // Create the file transcript
-                                File file = ButtonListener.createTranscriptFile(jda, ticket, config);
-                                InputStream stream = new FileInputStream(file);
-                                FileUpload fileUpload = FileUpload.fromData(stream, "ticket_transcript_" + ticketId + ".log");
-
-                                // Send the file
-                                EmbedBuilder embed = new EmbedBuilder()
-                                        .setColor(Color.CYAN).setTitle("Ticket Transcript")
-                                        .appendDescription("Click the file to download the ticket transcript for ticket **" + ticketId + "**.");
-                                transcriptChannel.sendMessageEmbeds(embed.build())
-                                        .addFiles(fileUpload).queue();
-                            } catch (Exception exception) {
-                                exception.printStackTrace();
-                            }
+                            createTranscriptFile(transcriptChannel, ticket);
                         }
 
                         // Delete the channel
@@ -141,62 +133,81 @@ public class TicketyBot extends ListenerAdapter {
         log.info("Tickety was successfully started in " + (System.currentTimeMillis() - time) + "ms!");
     }
 
-    public void registerCommands() {
-        jda.upsertCommand("ticket-panel", "Send the panel of the ticket for a specific channel.")
-                .addOption(OptionType.CHANNEL, "channel", "Specify the channel to send the ticket panel in", true)
-                .queue();
-
-        jda.upsertCommand("shutdown", "Shutdown the bot properly.")
-                .queue();
-    }
-
     @Override
     public void onShutdown(@NotNull ShutdownEvent event) {
         long time = System.currentTimeMillis();
         log.info("Shutting down Tickety bot...");
 
         // Shutdown database
-        database.shutdown();
+        this.database.shutdown();
 
         // Done
         log.info("Tickety was successfully started in " + (System.currentTimeMillis() - time) + "ms!");
     }
 
-    public void registerListeners() {
-        jda.addEventListener(this, new CommandListener(), new ButtonListener(this), new GeneralListener(this));
-    }
-
     // Java Application start
     public static void main(String[] args) {
         try {
-            instance = new TicketyBot();
+            INSTANCE = new TicketyBot();
         } catch (Exception exception) {
             exception.printStackTrace();
         }
     }
 
-    public static TicketyBot getInstance() {
-        return instance;
+    private void createTranscriptFile(TextChannel channel, Ticket ticket) {
+        try {
+            String ticketId = ticket.getId();
+
+            // Create the file transcript
+            File file = Common.createTranscriptFile(this.jda, ticket, this.config);
+            InputStream stream = new FileInputStream(file);
+            FileUpload fileUpload = FileUpload.fromData(stream, "ticket_transcript_" + ticketId + ".log");
+
+            // Send the file
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setColor(Color.CYAN)
+                    .setTitle("Ticket Transcript")
+                    .appendDescription("Click the file to download the ticket transcript for ticket **" + ticketId + "**.");
+            channel.sendMessageEmbeds(embed.build())
+                    .addFiles(fileUpload)
+                    .queue();
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
     }
 
-    public JDA getJda() {
-        return jda;
+    private void registerListeners() {
+        this.jda.addEventListener(
+                this,
+                new CommandListener(),
+                new ButtonListener(this),
+                new GeneralListener(this)
+        );
     }
 
-    public Logger getLog() {
-        return log;
+    private void registerCommands() {
+        this.jda.upsertCommand("ticket-panel", "Send the panel of the ticket for a specific channel.")
+                .addOption(OptionType.CHANNEL, "channel", "Specify the channel to send the ticket panel in", true)
+                .queue();
+
+        this.jda.upsertCommand("shutdown", "Shutdown the bot properly.")
+                .queue();
     }
 
-    public BotConfig getConfig() {
-        return config;
+    public static TicketyBot get() {
+        return INSTANCE;
     }
 
-    public ActivityManager getActivityManager() {
-        return activityManager;
+    public @NotNull BotConfig getConfig() {
+        return this.config;
     }
 
-    public Database getDatabase() {
-        return database;
+    public @NotNull ActivityManager getActivityManager() {
+        return this.activityManager;
+    }
+
+    public @NotNull Database getDatabase() {
+        return this.database;
     }
 }
 
