@@ -11,7 +11,6 @@ import me.liamhbest.tickety.managers.ActivityManager;
 import me.liamhbest.tickety.utility.BotConfig;
 import me.liamhbest.tickety.utility.Common;
 import me.liamhbest.tickety.utility.exceptions.DatabaseLoadException;
-import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
@@ -20,7 +19,7 @@ import net.dv8tion.jda.api.events.ShutdownEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.requests.GatewayIntent;
-import net.dv8tion.jda.api.utils.FileUpload;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jetbrains.annotations.NotNull;
 
 import javax.security.auth.login.LoginException;
@@ -37,11 +36,11 @@ public class TicketyBot extends ListenerAdapter {
 
     private static TicketyBot INSTANCE;
 
-    private final @NotNull JDA jda;
-    private final @NotNull Logger log = Logger.getLogger("Tickety");
-    private final @NotNull BotConfig config;
-    private final @NotNull ActivityManager activityManager;
-    private final @NotNull Database database;
+    private final @NonNull JDA jda;
+    private final @NonNull Logger log = Logger.getLogger("Tickety");
+    private final @NonNull BotConfig config;
+    private final @NonNull ActivityManager activityManager;
+    private final @NonNull Database database;
 
     public TicketyBot() throws LoginException, IOException, InterruptedException, DatabaseLoadException, URISyntaxException {
         long time = System.currentTimeMillis();
@@ -115,13 +114,15 @@ public class TicketyBot extends ListenerAdapter {
                         // Get the transcript channel and create the transcript
                         TextChannel transcriptChannel = jda.getTextChannelById(config.getTicketTranscriptChannelId());
                         if (transcriptChannel != null) {
-                            createTranscriptFile(transcriptChannel, ticket);
+                            try {
+                                Common.createTranscriptFile(jda, ticket, config);
+                            } catch (Exception exception) {
+                                exception.printStackTrace();
+                            }
                         }
 
-                        // Delete the channel
+                        // Delete the channel and ticket
                         channel.delete().queueAfter(3, TimeUnit.SECONDS);
-
-                        // Delete the ticket in the database
                         database.deleteTicket(ticket);
                     }
                 }
@@ -154,28 +155,6 @@ public class TicketyBot extends ListenerAdapter {
         }
     }
 
-    private void createTranscriptFile(TextChannel channel, Ticket ticket) {
-        try {
-            String ticketId = ticket.getId();
-
-            // Create the file transcript
-            File file = Common.createTranscriptFile(this.jda, ticket, this.config);
-            InputStream stream = new FileInputStream(file);
-            FileUpload fileUpload = FileUpload.fromData(stream, "ticket_transcript_" + ticketId + ".log");
-
-            // Send the file
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setColor(Color.CYAN)
-                    .setTitle("Ticket Transcript")
-                    .appendDescription("Click the file to download the ticket transcript for ticket **" + ticketId + "**.");
-            channel.sendMessageEmbeds(embed.build())
-                    .addFiles(fileUpload)
-                    .queue();
-        } catch (Exception exception) {
-            exception.printStackTrace();
-        }
-    }
-
     private void registerListeners() {
         this.jda.addEventListener(
                 this,
@@ -198,15 +177,15 @@ public class TicketyBot extends ListenerAdapter {
         return INSTANCE;
     }
 
-    public @NotNull BotConfig getConfig() {
+    public @NonNull BotConfig getConfig() {
         return this.config;
     }
 
-    public @NotNull ActivityManager getActivityManager() {
+    public @NonNull ActivityManager getActivityManager() {
         return this.activityManager;
     }
 
-    public @NotNull Database getDatabase() {
+    public @NonNull Database getDatabase() {
         return this.database;
     }
 }
