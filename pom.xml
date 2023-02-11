@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>me.liamhbest</groupId>
+    <groupId>com.github.liamdev06.discbots</groupId>
     <artifactId>tickety</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
@@ -29,7 +29,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>me.liamhbest.tickety.TicketyBot</mainClass>
+                            <mainClass>com.github.liamdev06.discbots.tickety.TicketyBot</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
