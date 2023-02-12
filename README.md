@@ -12,4 +12,4 @@ Tickety is a simple ticket discord bot that I made as a trial project to join th
 Note that this is a simple and lightweight bot with a minimal amount of features.
 
 ## Disclaimer
-This was a one-time temporary project and is not acitvely maintanied nor does it receive frequent updates/fixes.  
+This was a one-time temporary project and is not acitvely maintanied nor does it receive frequent updates/fixes. It is NOT meant to be run even though it's technically possible to compile and build it.  
